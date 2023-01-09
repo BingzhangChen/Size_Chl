@@ -15,7 +15,7 @@ source('Final_keras_model.R')
 source('Example_spectrum.R')
 
 #Plot the partial effects of each individual predictors on mean size and size variance
-source('Single_variable_spectra.R')
+source('Single_variable_effect_spectra.R')
 
 #Plot the partial effects of each individual predictors on mean size and size variance
 source('Interactive_effects.R')
