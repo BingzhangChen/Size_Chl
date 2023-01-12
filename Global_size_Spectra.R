@@ -5,7 +5,6 @@ Global_grid <- Global_grid %>%
   mutate(CWM = NA) %>%
   mutate(VAR = NA)
 
-
 #Run prediction by season
 for (k in 1:length(DOYs)){
 
