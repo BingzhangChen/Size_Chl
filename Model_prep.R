@@ -5,8 +5,8 @@ library(tensorflow)
 library(tidymodels)
 library(tfdatasets)
 library(modelr)
-library(ggpubr)
-library(plot3D)
+#library(ggpubr)
+#library(plot3D)
 library(ncdf4)
 
 ncread  <- function(file, VAR, start = NA, count = NA){
