@@ -5,15 +5,16 @@ library(tensorflow)
 library(tidymodels)
 library(tfdatasets)
 library(modelr)
-#library(ggpubr)
-#library(plot3D)
+library(ggpubr)
+library(plot3D)
 library(ncdf4)
 
+#Function reading data from netcdf files
 ncread  <- function(file, VAR, start = NA, count = NA){
   if(file.exists(file)){
     nc    <- nc_open(file)
   }else{
-    stop(paste(file,'does not exist!'))
+    stop(paste(file,'does not exist!')   )
   }
   data    <- ncvar_get(nc, VAR, start = start, count = count)
   nc_close(nc)
