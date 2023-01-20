@@ -6,7 +6,7 @@ source('Model_prep.R')
 #source('Exploration.R')
 
 #Comparing different models using 10-fold cross validation
-#source('varImp_keras.R') #Results are that the models of TChl, size, Temp, NO3 is good enough
+source('varImp_keras.R') #Results are that the models of TChl, size, Temp, NO3 is good enough
 
 #Final model for prediction
 source('Final_keras_model.R')

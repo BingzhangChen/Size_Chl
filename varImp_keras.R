@@ -3,7 +3,8 @@ Xnames <- list(c('label', 'Size', 'Ln_TChl'),
                c('label', 'Size', 'Ln_TChl', 'NO3'),
                c('label', 'Size', 'Ln_TChl', 'Temp', 'NO3'),
                c('label', 'Size', 'Ln_TChl', 'Temp', 'Ln_dFe'),
-               c('label', 'Size', 'Ln_TChl', 'Temp', 'NO3', 'Ln_dFe')
+               c('label', 'Size', 'Ln_TChl', 'Temp', 'NO3', 'Ln_dFe'),
+               c('label', 'Size', 'Ln_TChl', 'Temp', 'NO3', 'Ln_dFe', 'P_s', 'Si_s', 'Ln_MLD', 'Ln_PAR')
               )
 
 #k-fold validation
@@ -60,12 +61,14 @@ for (i in 1:N_fold){
     MAE_rm_var[L, ncol(MAE_rm_var)] <- cff$MAE
     COR_rm_var[L, ncol(COR_rm_var)] <- cff$COR
   }
+  
+  #save MAE_rm_var and COR_rm_var
+  save(MAE_rm_var, COR_rm_var, file = 'MAE_COR.Rdata')
+
 }
 
-#save MAE_rm_var and COR_rm_var
-save(MAE_rm_var, COR_rm_var, file = 'MAE_COR.Rdata')
 
-#Conclusion: Model 4 or 2 is good enough
+#Conclusion: Model 4 is good enough
 pdf("Keras_model_comparisons.pdf", width = 8, height = 10)
 par(font.lab  = 1,
     family    = "serif",
