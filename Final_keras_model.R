@@ -12,8 +12,8 @@ Mid_size <- numeric(length(dsize))
 for (i in 1:length(Mid_size)) Mid_size[i] <- sqrt(Newsize[i]* 
                                                   Newsize[i+1])
 
-#Run the model with TChl, Size, and temperature
-xname <- c('label', 'Size', 'Ln_TChl', 'Temp')
+#Run the model with TChl, Size,  temperature, and NO3
+xname <- c('label', 'Size', 'Ln_TChl', 'Temp', 'NO3')
 Data  <- Full_data %>% 
   select(all_of(xname))
 
@@ -46,7 +46,7 @@ moments <- function(Cp){
   return(list(CWM = CWM, VAR = VAR))
  
 }
-Spectra_keras <- function(Temp, Ln_TChl, cal.density = T, expand = T){
+Spectra_keras <- function(Temp, Ln_TChl, NO3, cal.density = T, expand = T){
   #This function computes the size spectrum, mean size and size variance based on Temperature, Chl, and NO3
   
   if (expand) { #Need to construct combinations of Temp and Chl and add Size
@@ -54,11 +54,12 @@ Spectra_keras <- function(Temp, Ln_TChl, cal.density = T, expand = T){
     newX <- expand.grid(
                        Size    = Newsize,
                        Ln_TChl = Ln_TChl, 
-                       Temp    = Temp
+                       Temp    = Temp,
+                       NO3     = NO3
                      )
   
-  }else{ #Take original inputs of Temp and Ln_TChl to construct predictive dataframe
-    G  <- data.frame(Temp = Temp, Ln_TChl = Ln_TChl) %>%
+  }else{ #Take original inputs of Temp, NO3, Ln_TChl to construct predictive dataframe
+    G  <- data.frame(Temp = Temp, Ln_TChl = Ln_TChl, NO3 = NO3) %>%
       mutate(ID = row.names(.))
     newX <- matrix(rep(t(G), N), ncol=ncol(G), byrow=TRUE) %>%
       as.data.frame() 
@@ -71,13 +72,15 @@ Spectra_keras <- function(Temp, Ln_TChl, cal.density = T, expand = T){
   
   newX <- newX %>%
     mutate(Temp = as.double(Temp)) %>%
-    mutate(Ln_TChl = as.double(Ln_TChl)) 
+    mutate(Ln_TChl = as.double(Ln_TChl)) %>%
+    mutate(NO3 = as.double(NO3))
  
   #A new dataframe holding the values of cumulative probability
   newY <- matrix(NA, nc = Nrep, nr = nrow(newX)) %>%
     as.data.frame() %>%
     mutate(Size    = newX$Size) %>%
     mutate(Temp    = newX$Temp) %>%
+    mutate(NO3     = newX$NO3) %>%
     mutate(Ln_TChl = newX$Ln_TChl)
   
   if (!expand){
@@ -87,7 +90,6 @@ Spectra_keras <- function(Temp, Ln_TChl, cal.density = T, expand = T){
       select(-ID) 
   }
   
-
   for (i in 1:Nrep){
     model <- models[[i]]
     
@@ -99,7 +101,7 @@ Spectra_keras <- function(Temp, Ln_TChl, cal.density = T, expand = T){
   
   #Convert newY to a column-list
   newY <- newY %>%
-    group_by(ID, Temp, Ln_TChl) %>%
+    group_by(ID, Temp, Ln_TChl, NO3) %>%
     nest()
   
   if (cal.density){
@@ -109,10 +111,11 @@ Spectra_keras <- function(Temp, Ln_TChl, cal.density = T, expand = T){
       newX1 <- expand.grid(
                     Size    = Mid_size,
                     Ln_TChl = Ln_TChl, 
-                    Temp    = Temp
+                    Temp    = Temp,
+                    NO3     = NO3
                   )
     } else{
-      G  <- data.frame(Temp = Temp, Ln_TChl = Ln_TChl)
+      G  <- data.frame(Temp = Temp, Ln_TChl = Ln_TChl, NO3 = NO3)
       newX <- matrix(rep(t(G), N), ncol=ncol(G), byrow=TRUE) %>%
               as.data.frame()
       colnames(newX) <- names(G)
@@ -126,8 +129,9 @@ Spectra_keras <- function(Temp, Ln_TChl, cal.density = T, expand = T){
       as.data.frame() %>%
       mutate(Size    = newX1$Size) %>%
       mutate(Temp    = newX1$Temp) %>%
+      mutate(NO3     = newX1$NO3)  %>%
       mutate(Ln_TChl = newX1$Ln_TChl) %>%
-      group_by(Temp, Ln_TChl) %>%
+      group_by(Temp, Ln_TChl, NO3) %>%
       nest()
   
     for (i in 1:nrow(newD)){
@@ -146,7 +150,7 @@ Spectra_keras <- function(Temp, Ln_TChl, cal.density = T, expand = T){
 
 #Compute mean and variance of ln ESD
 Mean_VAR_size <- function(dat, keep.rep = T, varname = 'Chl'){
-  #varname can be either 'Chl' or 'Temp'
+  #varname can be either 'Chl' or 'Temp' or 'NO3'
   
   #Mean log ESD
   Nrep <- ncol(dat$data[[1]])-1
@@ -193,6 +197,12 @@ Mean_VAR_size <- function(dat, keep.rep = T, varname = 'Chl'){
         
       VAR <- VAR %>%
         mutate(Temp = Temps[id])   
+    }else if (varname == 'NO3'){
+       MEAN <- MEAN %>%
+        mutate(NO3 = NO3s[id])
+        
+       VAR <- VAR %>%
+        mutate(NO3 = NO3s[id])   
     }else{
       #do nothing
     }
@@ -201,6 +211,5 @@ Mean_VAR_size <- function(dat, keep.rep = T, varname = 'Chl'){
     MEAN <- apply(Mean_LnESD, 1, function(x)mean(x, na.rm=T))
     VAR  <- apply( VAR_LnESD, 1, function(x)mean(x, na.rm=T))
   }
- 
   return(list(CWM = MEAN, VAR = VAR))
 }
