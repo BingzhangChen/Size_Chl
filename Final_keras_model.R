@@ -9,9 +9,16 @@ dsize   <- diff(Newsize)
 
 #Midpoint of Newsize for computing density profile
 Mid_size <- numeric(length(dsize))
+
 for (i in 1:length(Mid_size)) Mid_size[i] <- sqrt(Newsize[i]* 
                                                   Newsize[i+1])
 
+#Convert Mid_size  to biovolume
+Vol <- pi/6*Mid_size^3
+
+#Convert biovolume to carbon (pgC cell-1)
+Size_class_C <- 0.216 *Vol^0.939
+ 
 #Run the model with TChl, Size,  temperature, and NO3
 xname <- c('label', 'Size', 'Ln_TChl', 'Temp', 'NO3')
 Data  <- Full_data %>% 
@@ -100,9 +107,15 @@ Spectra_keras <- function(Temp, Ln_TChl, NO3, cal.density = T, expand = T){
   }
   
   #Convert newY to a column-list
+  if (!expand){
   newY <- newY %>%
     group_by(ID, Temp, Ln_TChl, NO3) %>%
     nest()
+  }else{
+   newY <- newY %>%
+    group_by(Temp, Ln_TChl, NO3) %>%
+    nest()   
+  }
   
   if (cal.density){
     
@@ -149,7 +162,7 @@ Spectra_keras <- function(Temp, Ln_TChl, NO3, cal.density = T, expand = T){
 }
 
 #Compute mean and variance of ln ESD
-Mean_VAR_size <- function(dat, keep.rep = T, varname = 'Chl'){
+Mean_VAR_size <- function(dat, keep.rep = T){
   #varname can be either 'Chl' or 'Temp' or 'NO3'
   
   #Mean log ESD
@@ -184,28 +197,7 @@ Mean_VAR_size <- function(dat, keep.rep = T, varname = 'Chl'){
       reshape(direction = 'long', 
               varying = list(1:ncol(.)),
               v.names = 'VAR')
-    
-    if (varname == 'Chl'){
-      MEAN <- MEAN %>%
-        mutate(TChl = TChls[id])
-        
-      VAR <- VAR %>%
-        mutate(TChl = TChls[id])
-    }else if (varname == 'Temp'){
-       MEAN <- MEAN %>%
-        mutate(Temp = Temps[id])
-        
-      VAR <- VAR %>%
-        mutate(Temp = Temps[id])   
-    }else if (varname == 'NO3'){
-       MEAN <- MEAN %>%
-        mutate(NO3 = NO3s[id])
-        
-       VAR <- VAR %>%
-        mutate(NO3 = NO3s[id])   
-    }else{
-      #do nothing
-    }
+
   }else{
     #Simply calculate the mean CWM and VAR
     MEAN <- apply(Mean_LnESD, 1, function(x)mean(x, na.rm=T))
@@ -213,3 +205,34 @@ Mean_VAR_size <- function(dat, keep.rep = T, varname = 'Chl'){
   }
   return(list(CWM = MEAN, VAR = VAR))
 }
+
+#Compute mean and variance of ln ESD
+Size_spectra_slope_intercept <- function(Cp, TChl, DSize = dsize){
+  #Cp: cumulative probability  
+  #Mean log ESD
+  N    <- length(Cp) 
+  D    <- diff(Cp)/DSize #Density probability
+  
+  #Compute total carbon biomass (mgC/m3)
+  theta  <- 1/50 #gChl:gC
+  TCarbon <- TChl/theta #total carbon: mgC/m3
+  
+  #Carbon in each size class
+  Carbon <- TCarbon /sum(D*DSize) * (D*DSize)
+
+  #Compute abundance (cells/mL)
+  Abun <- Carbon/Size_class_C/1e3 
+  
+  #Run linear regression of abundance against size
+  Dat <- data.frame(Size = log(Size_class_C), Abun = Abun ) %>%
+    filter(Abun > 0)
+  A_Lm <- lm(log(Abun) ~ Size, data = Dat)
+  
+# pdf('test.pdf', width = 4, height = 4, page = 'a4')
+# plot(log(Size_class_C), log(Abun))
+# abline(A_Lm)
+# dev.off()
+  return(list(Slope = coef(summary(A_Lm))[2,1], 
+                    Intercept = coef(summary(A_Lm))[1,1]))
+}
+

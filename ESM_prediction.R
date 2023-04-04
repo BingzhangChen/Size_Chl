@@ -19,8 +19,14 @@ ESM_Chl <- ESM_Chl*1e6 #Correct the unit of Chl to µg/L
    
 ESM_sst_file <- 'tos_Omon_CESM2-WACCM_ssp585_r1i1p1f1_gr_201501-210012.nc'
 ESM_SST      <- ncread(ESM_sst_file, 'tos')
-#Time_sst     <- ncread(ESM_sst_file, 'time') #The same with Time
-#ESM_Lat_sst  <- ncread(ESM_sst_file, 'lat') #The same with ESM_Lat
+Time_sst     <- ncread(ESM_sst_file, 'time') #The same with Time
+ESM_Lat_sst  <- ncread(ESM_sst_file, 'lat') #The same with ESM_Lat
+
+ESM_no3_file <- 'no3os_Omon_CESM2-WACCM_ssp585_r1i1p1f1_gr_201501-210012.nc'
+ESM_NO3      <- ncread(ESM_no3_file, 'no3os')
+ESM_NO3      <- ESM_NO3*1e3 #Convert the unit of NO3 to mmol m^-3
+Time_NO3     <- ncread(ESM_no3_file, 'time') #The same with Time
+ESM_Lat_no3  <- ncread(ESM_no3_file, 'lat') #The same with ESM_Lat
 
 #Calculate the difference between the average between 2015 and 2020 and that between 2095 and 2100
 #First, extract the indices
@@ -32,7 +38,9 @@ ESM_grid <- expand.grid(ESM_Lon, ESM_Lat, newTime[w])
 colnames(ESM_grid) <- c('Lon', 'Lat', 'Date')
 ESM_grid$Temp <- as.vector(ESM_SST[,,w])
 ESM_grid$TChl <- as.vector(ESM_Chl[,,w])
+ESM_grid$NO3  <- as.vector(ESM_NO3[,,w])
 ESM_grid$TChl[ESM_grid$TChl < 0 &!is.na( ESM_grid$TChl)] <- NA
+ESM_grid$NO3[ ESM_grid$NO3  < 0 &!is.na( ESM_grid$NO3)]  <- NA
 ESM_grid$CWM  <- NA
 ESM_grid$VAR  <- NA
 
@@ -46,6 +54,7 @@ for (k in 1:length(w)){
   system.time(
     B <- Spectra_keras(Temp    =     ESM_grid[wx,]$Temp, 
                        Ln_TChl = log(ESM_grid[wx,]$TChl),
+                       NO3     = sqrt(sqrt(ESM_grid[wx,]$NO3)),
                        cal.density = F,
                        expand  = F)
   )
@@ -56,10 +65,11 @@ for (k in 1:length(w)){
   ESM_grid[wx,]$CWM <- d$CWM
   ESM_grid[wx,]$VAR <- d$VAR
 
-  save(ESM_grid, file = 'ESM_Mean_VAR.Rdata')
+  if (k %% 10 == 0) save(ESM_grid, file = 'ESM_Mean_VAR_NO3.Rdata')
 }
+save(ESM_grid, file = 'ESM_Mean_VAR_NO3.Rdata')
 
-load('ESM_Mean_VAR.Rdata')
+load('ESM_Mean_VAR_NO3.Rdata')
 
 #Calculate the climatological annual mean between 2015 and 2019
 ESM_grid <- ESM_grid %>%
@@ -71,7 +81,8 @@ ESM1 <- ESM_grid %>%
   summarize(CWM = mean(CWM, na.rm = T),
             VAR = mean(VAR, na.rm = T),
             SST = mean(Temp,na.rm = T),
-            CHL = mean(TChl,na.rm = T)
+            CHL = mean(TChl,na.rm = T),
+            NO3 = mean(NO3, na.rm = T)
             )
 
 ESM2 <- ESM_grid %>%
@@ -80,7 +91,8 @@ ESM2 <- ESM_grid %>%
   summarize(CWM = mean(CWM, na.rm = T),
             VAR = mean(VAR, na.rm = T),
             SST = mean(Temp,na.rm = T),
-            CHL = mean(TChl,na.rm = T)
+            CHL = mean(TChl,na.rm = T),
+            NO3 = mean(NO3, na.rm = T)
             )
 
 #Transform the dataset
@@ -108,12 +120,19 @@ CHL1 <- matrix(ESM1$CHL,
 CHL2 <- matrix(ESM2$CHL, 
                nr = length(ESM_Lon),
                nc = length(ESM_Lat))  
+NO31 <- matrix(ESM1$NO3, 
+               nr = length(ESM_Lon),
+               nc = length(ESM_Lat))  
+NO32 <- matrix(ESM2$NO3, 
+               nr = length(ESM_Lon),
+               nc = length(ESM_Lat))  
 
 #Calculate changes in % compared to baseline
 CWM_change_perc <- (exp(CWM2) - exp(CWM1))/exp(CWM1)
 VAR_change_perc <- (VAR2 - VAR1)/VAR1
 SST_change      <- SST2 - SST1
 CHL_change_perc <- (CHL2 - CHL1)/CHL1
+NO3_change_perc <- (NO32 - NO31)/NO31
 
 #Keep consistent with previous plotting (by putting Atlantic in the central position)
 w1 <- which(ESM_Lon >  180)
@@ -126,6 +145,7 @@ ESM_Lon1[ESM_Lon1 > 180] <- ESM_Lon1[ESM_Lon1 > 180] - 360
 CWM_change_perc1 <- CWM_change_perc[ c(w1, w2),]
 VAR_change_perc1 <- VAR_change_perc[ c(w1, w2),]
 CHL_change_perc1 <- CHL_change_perc[ c(w1, w2),]
+NO3_change_perc1 <- NO3_change_perc[ c(w1, w2),]
 SST_change1      <- SST_change[ c(w1, w2),]
 CWM1             <- CWM1[ c(w1, w2),]
 
@@ -141,10 +161,10 @@ image2D(exp(CWM1), ESM_Lon1, ESM_Lat,
 mtext('Mean ESD (µm) 2015-2019', adj=0)
 
 #Plot the differences of mean size and size diversity
-pdf("Diff_ESM_CWM_VAR.pdf", width = 12, height = 7)
+pdf("Diff_ESM_CWM_VAR_NO3.pdf", width = 12, height = 9)
 par(font.lab  = 1,
     family    = "serif",
-    mfrow     = c(2,2),
+    mfrow     = c(3,2),
     mgp       = c(2.2,1,0),
     oma       = c(3,2,2,2),
     mar       = c(2.5,3.1,1,.5)
@@ -214,6 +234,24 @@ image2D(z, ESM_Lon1, ESM_Lat,
         cex.axis= 1.2,
         main = '')
 mtext('D) Percentage in changes in surface Chlorophyll', adj=0)
+
+#Plot changes in mean NO3
+NO3_range  <- quantile(NO3_change_perc1, probs = c(0.025,0.975), na.rm=T)
+C1         <- max(abs(NO3_range))
+z          <- NO3_change_perc1
+z[z < -C1] <- -C1
+z[z > C1]  <-  C1
+
+image2D(z, ESM_Lon1, ESM_Lat,
+        col = jet.colors(18), 
+        frame= F,
+        xlab = "", 
+        ylab = "",
+        cex.lab = 1.2,
+        cex.axis= 1.2,
+        main = '')
+mtext('E) Percentage in changes in surface nitrate', adj=0)
+
 mtext('Longitude (ºE)', adj=0.5, side=1, outer = T)
 mtext('Latitude (ºN)',  adj=0.5, side=2, outer = T)
 
